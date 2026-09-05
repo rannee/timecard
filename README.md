@@ -6,7 +6,7 @@ I have no plans to add features.
 
 ## Usage
 
-Go to Github Pages link to view the live app. All data is stored only in your local browser. 
+Go to [Github Pages link](https://rannee.github.io/timecard/src/index.html) to view the live app. All data is stored only in your local browser. 
 
 Click Clear to start a new day, otherwise use the actions column. If you need to update a time, you can use the time selector tool to update it.
 
