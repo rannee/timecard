@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Timecard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="A localstorage timecard app" />
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800px' height='800px' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10' stroke='%23000000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+
+<body class="w3-black">
+  <header>
+    <h1>Timecard</h1>
+  </header>
+
+  <main>
+    <!-- clear button -->
+    <section>
+      <div>
+        <button id="clear-data" onclick="clearAll();">Clear</button>
+      </div>
+    </section>
+
+    <!-- table, populated by JS -->
+    <section>
+      <table class="table" id="timetable">
+      </table>
+    </section>
+    <section></section>
+  </main>
+
+  <footer></footer>
+
+  <script>
+    // local storage key name
+    const STORENAME = "wfhTimecard"
+    const BREAK_STORENAME = "inBreak"
+
+    // load table contents on startup
+    window.onload = () => {
+      refreshTable()
+    }
+
+    // initialise start/end of day 
+    const addDayTime = (key) => {
+      let times = getLocalStorage()
+      times[key] = new Date()
+      times[key].setSeconds(0, 0) // normalise seconds
+
+      updateLocalStorage(times)
+      refreshTable();
+    }
+
+    // update from date picker
+    const updateDayTime = (key) => {
+      let times = getLocalStorage()
+
+      let time = new Date()
+      const timeVal = document.getElementById('picker-' + key).value.split(':')
+
+      time.setHours(parseInt(timeVal[0]), parseInt(timeVal[1]), 0, 0)
+
+      times[key] = time
+
+      updateLocalStorage(times)
+      refreshTable();
+    }
+
+    // handle breaks
+    const toggleBreak = () => {
+      let times = getLocalStorage()
+
+      const currentMin = new Date()
+      currentMin.setSeconds(0, 0)
+
+      if (isInBreak()) {
+        //  currently in a break
+        const currentBreak = times.breaks.pop()
+        currentBreak.end = currentMin
+        times.breaks.push(currentBreak)
+        updateLocalStorage(times)
+
+
+      }
+      else {
+        // start a new break
+        if (times.breaks == undefined) {
+          times.breaks = []
+        }
+
+        times.breaks.push({ 'start': currentMin, 'end': '' })
+        updateLocalStorage(times)
+
+      }
+
+      localStorage.setItem(BREAK_STORENAME, !isInBreak())
+      refreshTable();
+    }
+
+    // helper - returns true if a break is currently active
+    const isInBreak = () => {
+      const val = localStorage.getItem(BREAK_STORENAME)
+      if (val === "true") {
+        return true
+      }
+      return false
+    }
+
+    // update break time
+    const updateBreakTime = (type, index) => {
+      let times = getLocalStorage()
+
+      let time = new Date()
+      const timeVal = document.getElementById(`picker-break${type}-${index}`).value.split(':')
+
+      time.setHours(parseInt(timeVal[0]), parseInt(timeVal[1]), 0, 0)
+
+      times.breaks[index][type] = time
+
+      updateLocalStorage(times)
+      refreshTable();
+    }
+
+    // delete break
+    const deleteBreak = (index) => {
+      let times = getLocalStorage()
+
+      times.breaks.splice(index, 1)
+
+      updateLocalStorage(times)
+      refreshTable();
+    }
+
+    // generic function to update storage
+    const updateLocalStorage = (data) => {
+      localStorage.setItem(STORENAME, JSON.stringify(data));
+    }
+
+    // get the time data from local storage
+    const getLocalStorage = () => {
+      const timesRaw = localStorage.getItem(STORENAME);
+      if (timesRaw == null) {
+        return {}
+      }
+      let times = JSON.parse(timesRaw)
+
+      return times
+    }
+
+    // delete all data. also clears the break flag.
+    const clearAll = (data) => {
+      localStorage.setItem(STORENAME, JSON.stringify({}));
+      localStorage.setItem(BREAK_STORENAME, false);
+
+      refreshTable();
+
+    }
+
+
+    // add data to table
+    const refreshTable = () => {
+      const table = document.getElementById("timetable")
+      const times = getLocalStorage()
+
+      // clear the table before we start adding rows
+      table.innerText = "" 
+
+      // initialise the header
+      const trHead = document.createElement('tr')
+      const columnNames = ["Event", "Time", "Action"]
+      columnNames.forEach((columnName) => {
+        const th = document.createElement('th')
+        th.innerText = columnName
+
+        trHead.appendChild(th)
+      })
+      table.appendChild(trHead)
+
+      // first row is always the start of the day
+      addTimeRow({
+        id: "startOfDay",
+        rowName: "Start of day",
+        timeRawValue: times.startOfDay,
+        timeOnChange: () => {updateDayTime('startOfDay')},
+        actionText: "Start day",
+        actionOnClick: () => {addDayTime('startOfDay')}
+      })
+
+
+      // const startDayRow = table.insertRow(1)
+      // startDayRow.insertCell(0).innerText = "Start of Day"
+      // const startDayVal = dt2timepickerval(new Date(times.startOfDay))
+      // startDayRow.insertCell(1).innerHTML = `<input type="time" id="picker-startOfDay" value="${startDayVal}" onChange="updateDayTime('startOfDay')">`
+      // startDayRow.insertCell(2).innerHTML = `<button id="day-start" onclick="addDayTime('startOfDay')">Start day</button>`
+
+      let breaks = []
+      if (times.breaks != undefined) {
+        breaks = times.breaks
+      }
+      const numBreaks = breaks.length
+      var totalBreakTime = 0
+
+      breaks.forEach((thisBreak, breakInd) => {
+        const breakStartRow = table.insertRow(-1)
+        breakStartRow.insertCell(0).innerHTML = "Break start"
+        const breakStart = new Date(thisBreak.start)
+        breakStartRow.insertCell(1).innerHTML = `<input type="time" id="picker-breakstart-${breakInd}" value="${dt2timepickerval(breakStart)}" onChange="updateBreakTime('start', ${breakInd})">`
+
+        const breakEndRow = table.insertRow(-1)
+        breakEndRow.insertCell(0).innerHTML = "Break end"
+        const breakEnd = new Date(thisBreak.end)
+        breakEndRow.insertCell(1).innerHTML = `<input type="time" id="picker-breakend-${breakInd}" value="${dt2timepickerval(breakEnd)}" onChange="updateBreakTime('end', ${breakInd})">`
+        // if currently in break, add end break button
+        if (numBreaks === (breakInd + 1) && isInBreak()) {
+          // currently in break
+          breakEndRow.insertCell(2).innerHTML = `<button onclick="toggleBreak()">End break</button>`
+
+          breakStartRow.insertCell(2).innerHTML = `(end break first to delete)`
+
+        } else {
+          // not currently in break
+          breakStartRow.insertCell(2).innerHTML = `<button onclick="deleteBreak(${breakInd})">Delete break</button>`
+
+
+          const thisBreakDuration = breakEnd.valueOf() - breakStart.valueOf()
+          totalBreakTime += thisBreakDuration
+        }
+
+
+      });
+
+      // add new break rows
+      if (!isInBreak()) {
+        const breakStartRow = table.insertRow(-1)
+        breakStartRow.insertCell(0).innerHTML = "" //"Break start"
+        breakStartRow.insertCell(1).innerHTML = "" //`<input type="time" id="picker-breakstart-${breaks.length}" value="" onChange="updateBreakTime('start', -1)">`
+        breakStartRow.insertCell(2).innerHTML = `<button onclick="toggleBreak()">Start new break</button>`
+      }
+
+      // const breakEndRow = table.insertRow(-1)
+      // breakEndRow.insertCell(0).innerHTML = "Break end"
+      // breakEndRow.insertCell(1).innerHTML = `<input type="time" id="picker-breakend-${breaks.length}" value="" onChange="updateBreakTime('end', -1)">`
+
+      // end of day row
+      const endDayRow = table.insertRow(-1)
+      endDayRow.insertCell(0).innerHTML = "End of Day"
+      endDayRow.insertCell(1).innerHTML = `<input type="time" id="picker-endOfDay" value="${dt2timepickerval(new Date(times.endOfDay))}" onChange="updateDayTime('endOfDay')">`
+      endDayRow.insertCell(2).innerHTML = `<button id="day-end" onclick="addDayTime('endOfDay')">End day</button>`
+
+
+      // calculations
+      const calcsRow1 = table.insertRow(-1)
+      calcsRow1.insertCell(0).innerHTML = "Total break time"
+      calcsRow1.insertCell(1).innerHTML = ms2hrsmins(totalBreakTime)
+
+
+      const calcsRow2 = table.insertRow(-1)
+      calcsRow2.insertCell(0).innerHTML = "Total worked time"
+
+      if (times.endOfDay) {
+        const workTime = (new Date(times.endOfDay)).valueOf() - (new Date(times.startOfDay)).valueOf() - totalBreakTime
+        calcsRow2.insertCell(1).innerHTML = ms2hrsmins(workTime)
+      } else {
+        calcsRow2.insertCell(1).innerHTML = "TBC"
+      }
+
+
+    }
+
+    // helper - inserts a new row in the time table
+    const addTimeRow = ({
+      rowName,
+      id,
+      timeRawValue,
+      timeOnChange,
+      actionText, // set to undefined to remove action row
+      actionOnClick,
+    }) => {
+      const table = document.getElementById("timetable")
+
+      const row = document.createElement('tr')
+      // const row = table.insertRow(-1)
+
+      // first column is the name
+      const rowNameE = document.createElement('td')
+      rowNameE.innerText = rowName
+      row.appendChild(rowNameE)
+
+      // second column - time picker with current known time
+      const timeVal = dt2timepickerval(new Date(timeRawValue))
+      const picker = document.createElement("input")
+      picker.type = "time"
+      picker.id = `picker-${id}`
+      picker.value = timeVal
+      picker.onchange = timeOnChange
+      const pickerTd = document.createElement('td')
+      pickerTd.appendChild(picker)
+      row.appendChild(pickerTd)
+
+      // third column - action, if any
+      const actionTd = document.createElement('td')
+      if (actionText === undefined) {
+        // do nothing 
+      } else {
+        const action = document.createElement('button')
+        action.id = `action-${id}`
+        action.onclick = actionOnClick
+        action.innerText = actionText
+
+        actionTd.appendChild(action)
+      }
+      row.appendChild(actionTd)
+
+      // add row to table
+      table.appendChild(row)
+    }
+
+
+    // helper - formats time to string
+    const dt2timepickerval = (datetime) => {
+      const val = `${datetime.getHours().toString().padStart(2, '0')}:${datetime.getMinutes().toString().padStart(2, '0')}`
+      return val
+    }
+
+    // helper - formats duration in milliseconds to a readable string
+    const ms2hrsmins = (mstime) => {
+      const hrtime = (mstime) / (60 * 60 * 1000)
+      val = `${Math.floor(hrtime)} hours ${Math.round((hrtime - Math.floor(hrtime)) * 60)} minutes`
+      return val
+    }
+  </script>
+
+</body>
+
+</html>
